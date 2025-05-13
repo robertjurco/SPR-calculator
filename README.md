@@ -1,4 +1,4 @@
- SPR Biosensor Simulation and Analysis Tool
+# SPR Biosensor Simulation and Analysis Tool
 
 This **Python-based simulation tool** is designed for researchers and engineers working on **Surface Plasmon Resonance (SPR) biosensors**. It enables the precise modeling and visualization of SPR response curves for multi-layered optical systems. By providing flexible configuration for material properties, layer thicknesses, and incident light characteristics, this tool empowers users to design, optimize, and analyze SPR-based sensors for various applications, such as biomolecular detection, chemical sensing, and environmental monitoring.
 
