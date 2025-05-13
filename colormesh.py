@@ -124,8 +124,8 @@ if __name__ == "__main__":
     )
 
     # Example usage 2
-    slice_ranges = {'bulk_n': (1.2, 1.5), 'wavelength': (500, 2000)}
-    fixed_parameters = {'angle': 62.5, 'thickness': 50}
+    slice_ranges = {'bulk_n': (1.3, 1.35), 'wavelength': (500, 2000)}
+    fixed_parameters = {'angle': 63.5, 'thickness': 50}
 
     X, Y, Z = colormesh(
         material='Ag',

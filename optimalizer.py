@@ -288,8 +288,10 @@ def imaging_sensitivity_surface(angle: float,
 
 def spectral_sensitivity_bulk(angle: float,
                              thickness: float,
+                             wavelength: float,
                              bulk_n,
-                             bulk_dn: float = 0.00005,
+                             wavelength_bounds: tuple = (1000, 2000),
+                             bulk_dn: float = 0.0005,
                              material: str = 'Au',
                              plot: bool = False,
                              optimize: bool = False,
@@ -298,46 +300,39 @@ def spectral_sensitivity_bulk(angle: float,
     Calculate spectral sensitivity for bulk material with optional plotting and optimization.
     """
 
-    # Validate and pre-process wavelength
-    if isinstance(wavelength, (list, np.ndarray)):
-        # If wavelength is an array, convert it to a scalar for optimization
-        wavelength_range = (wavelength[0], wavelength[-1])  # Save bounds
-        wavelength_mean = np.mean(wavelength)  # Use the mean as the initial guess for optimization
-    else:
-        # Scalar wavelength case
-        wavelength_range = (400, 800)  # Default range, adjustable as needed (or you can skip this entirely)
-        wavelength_mean = wavelength
+    # Prepare wavelengths
+    wavelength_range = np.arange(wavelength_bounds[0], wavelength_bounds[1], 0.1)
 
-    intensity_0 = intensity(angle, wavelength, thickness, bulk_n, material=material)
-    intensity_1 = intensity(angle, wavelength, thickness, bulk_n+bulk_dn, material=material)
+    intensity_0 = intensity(angle, wavelength_range, thickness, bulk_n, material=material)
+    intensity_1 = intensity(angle, wavelength_range, thickness, bulk_n+bulk_dn, material=material)
 
-    # minima
-    min_wavelength = wavelength[np.argmin(intensity_0)]
-    min_wavelength_dn = wavelength[np.argmin(intensity_1)]
+    # Find minimum intensity along the wavelength axis for each bulk_n
+    # find wavelengths corresponding to the minimum intensity
+    min_wavelength_0 = wavelength_range[np.argmin(intensity_0, axis=1)]
+    min_wavelength_1 = wavelength_range[np.argmin(intensity_1, axis=1)]
+
 
     # Calculate sensitivity
-    spectral_sensitivity = (min_wavelength_dn - min_wavelength) / bulk_dn
+    spectral_sensitivity = (min_wavelength_1 - min_wavelength_0) / bulk_dn
 
     if plot:
         # Create main axis for intensity
         fig, ax1 = plt.subplots(figsize=(10, 6))
-        ax1.plot(wavelength, intensity_0, label=f'Intensity, Bulk RI={format_float(bulk_n)}', color='blue')
-        ax1.plot(wavelength, intensity_1, label=f'Intensity, Bulk RI={format_float(bulk_n+bulk_dn)}', color='red')
-        ax1.set_xlabel('Wavelength (nm)')
-        ax1.set_ylabel('Intensity')
+        ax1.plot(bulk_n, min_wavelength_0, label=f'Original wavelength', color='blue')
+        ax1.plot(bulk_n, min_wavelength_1, label=f'Response', color='red')
+        ax1.set_xlabel('Refractive index [RIU]')
+        ax1.set_ylabel('Wavelength responses [nm]')
         ax1.tick_params(axis='y')
-        ax1.legend(loc='lower left')
+        ax1.legend(loc='upper left')
         ax1.grid(True)
 
-        # Create secondary axis for sensitivity
         ax2 = ax1.twinx()
-        ax2.plot(wavelength, spectral_sensitivity, label='Spectral Sensitivity', color='black', linestyle='--')
-        ax2.set_ylabel('Spectral Sensitivity', color='black')
-        ax2.tick_params(axis='y', labelcolor='black')
+        ax2.plot(bulk_n, spectral_sensitivity, label=f'Bulk Spectral Sensitivity', color='black', linestyle='--')
+        ax2.set_ylabel('Sensitivity [nm/RIU]', color='black')
         ax2.legend(loc='lower right')
 
         # Add title including angle, thickness, and refractive index
-        plt.title(f'Bulk Spectral Sensitivity and Intensities\nAngle: {angle:.2f}°, Thickness: {thickness:.2f} nm, Material: {material}')
+        plt.title(f'Bulk Spectral Sensitivity \nAngle: {angle:.2f}°, Thickness: {thickness:.2f} nm, Material: {material}')
         plt.show()
 
     return spectral_sensitivity
@@ -390,9 +385,10 @@ def spectral_sensitivity_surface(x, dn=0.00005, wavelength_range=(400, 800), res
 if __name__ == "__main__":
     # Example usage
     wavelength = np.linspace(1500, 1700, 100)
+    bulk_n = np.linspace(1.33, 1.343, 100)
 
-    imaging_sensitivity_bulk(angle=62.5, wavelength=wavelength, thickness=50, material='Ag', plot=True, optimize=True)
-    imaging_sensitivity_surface(angle=62.5, wavelength=wavelength, thickness=50, material='Ag', plot=True, optimize=True)
-    #spectral_sensitivity_bulk(angle=62.5, wavelength=wavelength, thickness=50, material='Ag', plot=True, optimize=False)
+    #imaging_sensitivity_bulk(angle=62.5, wavelength=wavelength, thickness=50, material='Ag', plot=True, optimize=True)
+    #imaging_sensitivity_surface(angle=62.5, wavelength=wavelength, thickness=50, material='Ag', plot=True, optimize=True)
+    spectral_sensitivity_bulk(angle=63.5, wavelength=1500, bulk_n=bulk_n, thickness=50, material='Ag', plot=True, optimize=False)
 
 
