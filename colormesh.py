@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from tqdm import tqdm
 
 from solver.solver import intensity
 
@@ -54,22 +53,28 @@ def colormesh(material: str,
     # Create meshgrid for x_range and y_range
     X, Y = np.meshgrid(x_range, y_range)
 
-    # Initialize Z matrix
-    Z = np.zeros_like(X, dtype=float)
+    # Prepare inputs for intensity function
+    intensity_inputs = {
+        'material': material,
+        'n_glass': n_glass,
+        slice_keys[0]: x_range,  # Accept arrays directly
+        slice_keys[1]: y_range,  # Accept arrays directly
+        fixed_keys[0]: fixed_params[fixed_keys[0]],
+        fixed_keys[1]: fixed_params[fixed_keys[1]],
+        'n_layers': n_layers,
+        'thickness_layers': thickness_layers
+    }
 
-    # Use tqdm in the loop to track progress for x_range
-    for i, x_val in tqdm(enumerate(x_range), total=len(x_range), desc="Computing intensities", ncols=100):
-        # Evaluate the intensity for the full Y column for x_val
-        Z[:, i] = [
-            intensity(material=material, n_glass=n_glass, **{
-                slice_keys[0]: x_val,
-                slice_keys[1]: y_val,
-                fixed_keys[0]: fixed_params[fixed_keys[0]],
-                fixed_keys[1]: fixed_params[fixed_keys[1]],
-                'n_layers': n_layers,
-                'thickness_layers': thickness_layers
-            }) for y_val in y_range
-        ]
+    # Compute Z matrix using vectorized intensity function
+    Z = intensity(**intensity_inputs)
+
+    # Correct the order of axes dynamically
+    intensity_order = ['angle', 'wavelength', 'thickness', 'bulk_n']  # Fixed result order of intensity function
+    slice_indices = [intensity_order.index(key) for key in slice_keys]  # Get indices of slice keys in intensity_order
+
+    # If the order of the slice indices is reversed, transpose Z
+    if slice_indices != sorted(slice_indices):  # Check if order matches expected increasing order
+        Z = Z.T
 
     # Units for plot
     units = {
@@ -107,8 +112,8 @@ def colormesh(material: str,
 
 if __name__ == "__main__":
     # Example usage
-    fixed_parameters = {'thickness': 50, 'bulk_n': 1.33}
     slice_ranges = {'angle': (60.0, 70.0), 'wavelength': (600, 1800)}
+    fixed_parameters = {'thickness': 50, 'bulk_n': 1.33}
 
     X, Y, Z = colormesh(
         material='Ag',
@@ -117,4 +122,29 @@ if __name__ == "__main__":
         n_glass=1.51,
         resolution=200,
     )
+
+    # Example usage 2
+    slice_ranges = {'bulk_n': (1.2, 1.5), 'wavelength': (500, 2000)}
+    fixed_parameters = {'angle': 62.5, 'thickness': 50}
+
+    X, Y, Z = colormesh(
+        material='Ag',
+        fixed_params=fixed_parameters,
+        slice_ranges=slice_ranges,
+        n_glass=1.51,
+        resolution=200,
+    )
+
+    # Example usage 3
+    slice_ranges = {'thickness': (10, 100), 'wavelength': (500, 2000)}
+    fixed_parameters = {'angle': 62.5, 'bulk_n': 1.33}
+
+    X, Y, Z = colormesh(
+        material='Ag',
+        fixed_params=fixed_parameters,
+        slice_ranges=slice_ranges,
+        n_glass=1.51,
+        resolution=200,
+    )
+
 

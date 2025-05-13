@@ -50,24 +50,42 @@ def intensity(angle, wavelength, thickness, bulk_n,
               material='Au',
               n_glass=1.51):
     """
-    Calculate intensity for a given angle and wavelength or an array of wavelengths.
+    Calculate the intensity of light for specified angles, wavelengths, and material properties
+    in a multilayer optical system.
 
-    This function automatically detects if the wavelength is an array or a single value,
-    and processes accordingly.
-
-    Parameters:
-        - angle: float, angle of incidence
-        - wavelength: float or array-like, wavelength(s) at which intensity is calculated.
-        - thickness: float, thickness of the main layer
-        - bulk_n: float, refractive index of the buffer layer
-        - n_layers: list, refractive indices of additional layers (optional)
-        - thickness_layers: list, thicknesses of additional layers (optional)
-        - material: str, material of the main layer
-        - n_glass: float, refractive index of the substrate (default: 1.51)
+    Args:
+        angle (float or array-like): Angle(s) of incidence in degrees.
+        wavelength (float or array-like): Wavelength(s) (in nm) for intensity calculation.
+        thickness (float or array-like): Thickness (in nm) of the main layer.
+        bulk_n (float or array-like): Refractive index of the bulk or buffer layer.
+        n_layers (list of floats, optional): Refractive indices of additional layers.
+        thickness_layers (list of floats, optional): Thicknesses (in nm) of additional layers.
+        material (str): Material of the main layer (default: 'Au').
+        n_glass (float): Refractive index of the substrate (default: 1.51).
 
     Returns:
-        - float or ndarray: Intensity value(s) for the given wavelength(s).
+        float or numpy.ndarray: Calculated light intensity as a scalar or array.
+
+    Raises:
+        ValueError: If n_layers and thickness_layers lengths do not match.
+
+    Notes:
+    - Supports both single-value and multi-dimensional inputs via broadcasting.
+    - Uses transfer-matrix methods to compute intensities based on optical paths.
+    - Additional layers are optional but must have matching refractive index and thickness lists.
+    - **Warning**: If the result is used in a colormesh or contour plot with two varying
+      parameters (e.g., `angle` and `wavelength`), ensure that the result's slicing order
+      matches the axes' order. You may need to transpose the result (`.T`) if the order differs.
+
+
+    Example:
+        >>> intensity(45.0, 632.8, 100.0, 1.4)
+        0.942
+
+        >>> intensity(45.0, [500, 600], 50.0, 1.2, n_layers=[1.8], thickness_layers=[10])
+        array([0.812, 0.864])
     """
+
     # Ensure inputs are arrays
     # Reshape inputs for broadcasting
     # Each parameter varies along its respective axis
@@ -152,16 +170,17 @@ def intensity(angle, wavelength, thickness, bulk_n,
     gamma_return = gamma(n, L, angle, 'tm')
     result = np.abs(gamma_return) ** 2
 
-    return np.squeeze(result)
+    # Transpose to keep correct order
+    return np.squeeze(result).T
 
 
 if __name__ == "__main__":
     def main():
         # Parameter ranges
-        angle_range = np.linspace(60, 70, 500)  # 50 points between 60° and 70°
-        wavelength_range = np.linspace(700, 2000, 500)  # 100 points between 700nm and 2000nm
-        thickness_range = np.linspace(10, 100, 500)  # 50 points for thickness between 10 nm and 100 nm
-        bulk_n_range = np.linspace(1.2, 1.6, 500)  # 50 points for bulk refractive index
+        angle_range = np.linspace(60, 70, 500)  # 500 points between 60° and 70°
+        wavelength_range = np.linspace(500, 2000, 500)  # 500 points between 500nm and 2000nm
+        thickness_range = np.linspace(10, 100, 500)  # 500 points for thickness between 10 nm and 100 nm
+        bulk_n_range = np.linspace(1.2, 1.37, 500)  # 500 points for bulk refractive index
 
         # Fixed parameters
         material = 'Au'  # Example material
@@ -178,10 +197,10 @@ if __name__ == "__main__":
             material=material
         )
         plt.figure(figsize=(8, 6))
-        plt.pcolormesh(wavelength_range, angle_range, intensities_angle_wavelength, shading='auto', cmap='viridis')
+        plt.pcolormesh(angle_range, wavelength_range, intensities_angle_wavelength, shading='auto', cmap='viridis')
         plt.colorbar(label="Intensity")
-        plt.xlabel("Wavelength [nm]")
-        plt.ylabel("Angle [°]")
+        plt.ylabel("Wavelength [nm]")
+        plt.xlabel("Angle [°]")
         plt.title("Intensity Map (Angle vs. Wavelength)")
         plt.show()
 
@@ -194,10 +213,10 @@ if __name__ == "__main__":
             material=material
         )
         plt.figure(figsize=(8, 6))
-        plt.pcolormesh(wavelength_range, thickness_range, intensities_wavelength_thickness.T, shading='auto', cmap='viridis')
+        plt.pcolormesh(thickness_range, wavelength_range, intensities_wavelength_thickness.T, shading='auto', cmap='viridis')
         plt.colorbar(label="Intensity")
-        plt.xlabel("Wavelength [nm]")
-        plt.ylabel("Thickness [nm]")
+        plt.ylabel("Wavelength [nm]")
+        plt.xlabel("Thickness [nm]")
         plt.title("Intensity Map (Wavelength vs. Thickness)")
         plt.show()
 
@@ -210,13 +229,11 @@ if __name__ == "__main__":
             material=material
         )
         plt.figure(figsize=(8, 6))
-        plt.pcolormesh(wavelength_range, bulk_n_range, intensities_wavelength_bulk_n.T, shading='auto', cmap='viridis')
+        plt.pcolormesh(bulk_n_range, wavelength_range, intensities_wavelength_bulk_n.T, shading='auto', cmap='viridis')
         plt.colorbar(label="Intensity")
-        plt.xlabel("Wavelength [nm]")
-        plt.ylabel("Bulk Refractive Index (n)")
+        plt.ylabel("Wavelength [nm]")
+        plt.xlabel("Bulk Refractive Index (n)")
         plt.title("Intensity Map (Wavelength vs. Bulk Refractive Index)")
         plt.show()
-
-
 
     main()
