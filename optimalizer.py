@@ -4,6 +4,9 @@ import numpy as np
 
 from solver.solver import intensity
 
+from tqdm import tqdm  # Import the tqdm library
+
+
 # Function to simplify float formatting dynamically
 def format_float(value: float) -> str:
     """Dynamically format a float to remove trailing zeros."""
@@ -338,57 +341,190 @@ def spectral_sensitivity_bulk(angle: float,
     return spectral_sensitivity
 
 
-def spectral_sensitivity_surface(x, dn=0.00005, wavelength_range=(400, 800), resolution=1, plot: bool = False,
-                                 optimize: bool = False):
+def spectral_sensitivity_surface(angle: float,
+                                thickness: float,
+                                wavelength: float,
+                                surface_n,
+                                wavelength_bounds: tuple = (1000, 2000),
+                                surface_dn: float = 0.003,
+                                bulk_n: float = 1.33,
+                                surface_thickness: float = 10,
+                                material: str = 'Au',
+                                plot: bool = False,
+                                optimize: bool = False,
+                                center_sensitivity: bool = False):
     """
-    Calculate spectral sensitivity for surface material with optional plotting and optimization.
+    Calculates spectral sensitivity for an array of surface refractive indices (surface_ns)
+    and returns minimum wavelengths and sensitivities.
+
+    Parameters:
+    - angle (float): Incident angle.
+    - thickness (float): Thickness of the layer.
+    - wavelength (float): Wavelength to evaluate.
+    - surface_ns (iterable): Array or list of surface refractive indices.
+    - wavelength_bounds (tuple): The range of wavelengths to consider (min, max).
+    - surface_dn (float): Change in refractive index for calculating sensitivity.
+    - bulk_n (float): Bulk refractive index.
+    - surface_thickness (float): Surface layer thickness.
+    - material (str): The material being analyzed.
+
+    Returns:
+    - min_wavelengths_0 (np.ndarray): Array of minimum wavelengths for surface_n.
+    - min_wavelengths_1 (np.ndarray): Array of minimum wavelengths for surface_n + surface_dn.
+    - sensitivities (np.ndarray): Array of spectral sensitivities.
     """
-    if optimize:
-        def objective(params):
-            return -spectral_sensitivity_surface(params, dn=dn, wavelength_range=wavelength_range,
-                                                 resolution=resolution)
 
-        res = minimize(objective, x0=x, bounds=[(400, 800), (0, 90), (1, 100), (1, 100)])
-        x = res.x
+    wavelength_range = np.arange(wavelength_bounds[0], wavelength_bounds[1], 0.005)   # Generate wavelength range
 
-    center_wavelength, angle, thickness_au, thickness_ti = x
-    wavelengths = np.arange(wavelength_range[0], wavelength_range[1], resolution)
+    sensitivities = []  # Initialize list to store sensitivities for each surface_n
+    min_wavelengths_0 = []  # To store min wavelength values for surface_n
+    min_wavelengths_1 = []  # To store min wavelength values for surface_n + surface_dn
 
-    intensities = []
-    for wavelength in wavelengths:
-        intensities.append(plasmon_n((wavelength, angle, thickness_au, thickness_ti)))
+    for surface_ni in tqdm(surface_n, desc="Calculating Sensitivity"):
+        # Calculate intensities for surface_n and surface_n + surface_dn
+        intensity_0 = intensity(angle, wavelength_range, thickness, bulk_n, n_layers=[surface_ni], thickness_layers=[surface_thickness], material=material)
+        intensity_1 = intensity(angle, wavelength_range, thickness, bulk_n, n_layers=[surface_ni + surface_dn], thickness_layers=[surface_thickness], material=material)
 
-    original_min_wavelength = wavelengths[np.argmin(intensities)]
+        # Find minimum intensity wavelengths
+        min_wavelength_0 = wavelength_range[np.argmin(intensity_0)]
+        min_wavelength_1 = wavelength_range[np.argmin(intensity_1)]
 
-    # Perturb the surface refractive index (apply dn)
-    intensities_dn = []
-    for wavelength in wavelengths:
-        n_layer = 1.33 + dn
-        n = [1.51, n_Ti(wavelength), n_AU(wavelength), n_layer, 1.33]
-        L = [thickness_ti * n_Ti(wavelength) / wavelength, thickness_au * n_AU(wavelength) / wavelength, 0.0]
-        intensity_dn = np.abs(gamma(n, L, angle, 'tm') ** 2)
-        intensities_dn.append(intensity_dn)
+        # Store the min wavelengths
+        min_wavelengths_0.append(min_wavelength_0)
+        min_wavelengths_1.append(min_wavelength_1)
 
-    min_wavelength_dn = wavelengths[np.argmin(intensities_dn)]
-    spectral_sensitivity = (min_wavelength_dn - original_min_wavelength) / dn
+        # Compute the spectral sensitivity
+        spectral_sensitivity = (min_wavelength_1 - min_wavelength_0) / surface_dn
+        sensitivities.append(spectral_sensitivity)  # Append sensitivity to list
+
 
     if plot:
-        plt.plot(wavelengths, intensities, label="Original")
-        plt.plot(wavelengths, intensities_dn, label="With dn")
-        plt.title('Spectral Sensitivity (Surface)')
-        plt.xlabel('Wavelength (nm)')
-        plt.ylabel('Intensity')
-        plt.legend()
+        # Create main axis for intensity
+        fig, ax1 = plt.subplots(figsize=(10, 6))
+        ax1.plot(surface_n, min_wavelengths_0, label=f'Original wavelength', color='blue')
+        ax1.plot(surface_n, min_wavelengths_1, label=f'Response', color='red')
+        ax1.set_xlabel('Refractive index [RIU]')
+        ax1.set_ylabel('Wavelength responses [nm]')
+        ax1.tick_params(axis='y')
+        ax1.legend(loc='center left')
+        ax1.grid(True)
+
+        ax2 = ax1.twinx()
+        ax2.plot(surface_n, sensitivities, label=f'Surface Spectral Sensitivity', color='black', linestyle='--')
+        ax2.set_ylabel('Sensitivity [nm/RIU]', color='black')
+        ax2.legend(loc='center right')
+
+        # Add title including angle, thickness, and refractive index
+        plt.title(f'Surface Spectral Sensitivity \nAngle: {angle:.2f}°, Thickness: {thickness:.2f} nm, Material: {material}')
         plt.show()
+
+    return sensitivities, min_wavelengths_0, min_wavelengths_1
+
+def spectral_sensitivity_layers(angle: float,
+                                thickness: float,
+                                wavelength_bounds: tuple = (1000, 2000),
+                                bulk_n: float = 1.33,
+                                layer_n: float = 1.4,
+                                layers_thickness: float = 15,
+                                num_layers: int = 10,
+                                material: str = 'Au',
+                                plot: bool = False):
+    """
+    Calculate and plot spectral sensitivity as layers are incrementally added,
+    based on the shift in the wavelength of minimum intensity.
+
+    Args:
+        angle (float): Incident angle in degrees.
+        thickness (float): Base layer thickness (in nm).
+        wavelength_bounds (tuple): Min and max bounds for wavelength (in nm).
+        bulk_n (float): Refractive index of the bulk medium.
+        surface_n (float): Refractive index of the added layers.
+        surface_thickness (float): Thickness of each added layer (in nm).
+        num_layers (int): Total number of layers to add incrementally.
+        material (str): Material name (e.g., 'Au', 'Ag').
+        plot (bool): Flag to enable plotting.
+
+    Returns:
+        Tuple[List[float], List[float]]: Sensitivity values and minimum wavelengths recorded
+        across the added layers.
+    """
+    # Generate wavelength range
+    wavelength_range = np.arange(wavelength_bounds[0], wavelength_bounds[1], 0.005)
+
+    # Initialize lists to store cumulative layer data, sensitivities, and minimum wavelengths
+    cumulative_n_layers = []
+    cumulative_thickness_layers = []
+    sensitivities = []
+    min_wavelengths = []
+
+    # Loop through adding layers incrementally
+    for num in tqdm(range(1, num_layers + 1), desc="Adding Layers"):
+        # Add a new layer with the specified refractive index and thickness
+        cumulative_n_layers.append(layer_n)
+        cumulative_thickness_layers.append(layers_thickness)
+
+        # Calculate intensity without and with the current cumulative configuration
+        intensity_without_layer = intensity(
+            angle, wavelength_range, thickness, bulk_n,
+            n_layers=cumulative_n_layers[:-1],  # Exclude current layer
+            thickness_layers=cumulative_thickness_layers[:-1],  # Exclude current layer
+            material=material
+        )
+        intensity_with_layer = intensity(
+            angle, wavelength_range, thickness, bulk_n,
+            n_layers=cumulative_n_layers,  # Include current layer
+            thickness_layers=cumulative_thickness_layers,  # Include current layer
+            material=material
+        )
+
+        # Find the wavelengths that correspond to the minimum intensity
+        min_wavelength_without_layer = wavelength_range[np.argmin(intensity_without_layer)]
+        min_wavelength_with_layer = wavelength_range[np.argmin(intensity_with_layer)]
+
+        # Sensitivity is the change in minimum intensity wavelength after adding the layer
+        sensitivity = np.abs(min_wavelength_with_layer - min_wavelength_without_layer)
+        sensitivities.append(sensitivity)
+        min_wavelengths.append(min_wavelength_with_layer)  # Record the minimum wavelength
+
+    # Plot results
+    if plot:
+        fig, ax1 = plt.subplots(figsize=(10, 6))
+
+        # Plot sensitivities on the second axis
+        ax1.set_xlabel('Number of Layers')
+        ax1.set_ylabel('Wavelength of Min Intensity [nm]', color='blue')
+        ax1.plot(range(1, num_layers + 1), min_wavelengths, marker='o', color='blue', label='Min Intensity Wavelength')
+        ax1.tick_params(axis='y', labelcolor='blue')
+        ax1.grid(True)
+
+        # Create a second y-axis for sensitivities
+        ax2 = ax1.twinx()
+        ax2.set_ylabel('Spectral Sensitivity [nm]', color='black')
+        ax2.plot(range(1, num_layers + 1), sensitivities, marker='s', linestyle='--', color='black',
+                 label='Spectral Sensitivity')
+        ax2.tick_params(axis='y', labelcolor='black')
+
+        # Add a combined legend
+        fig.legend(loc='upper left', bbox_to_anchor=(0.1, 0.85))
+        plt.title(f'Spectral Sensitivity and Min Wavelength vs. Number of Layers\nAngle: {angle:.2f}°')
+        plt.show()
+
+    return sensitivities, min_wavelengths
+
 
 
 if __name__ == "__main__":
     # Example usage
     wavelength = np.linspace(1500, 1700, 100)
     bulk_n = np.linspace(1.33, 1.343, 100)
+    surface_n = np.linspace(1.33, 1.6, 100)
 
     #imaging_sensitivity_bulk(angle=62.5, wavelength=wavelength, thickness=50, material='Ag', plot=True, optimize=True)
     #imaging_sensitivity_surface(angle=62.5, wavelength=wavelength, thickness=50, material='Ag', plot=True, optimize=True)
-    spectral_sensitivity_bulk(angle=63.5, wavelength=1500, bulk_n=bulk_n, thickness=50, material='Ag', plot=True, optimize=False)
+    #spectral_sensitivity_bulk(angle=63.5, wavelength=1500, bulk_n=bulk_n, thickness=50, material='Ag', plot=True, optimize=False)
+    #spectral_sensitivity_surface(angle=62.5, wavelength=1500, surface_n=surface_n, thickness=50, material='Ag', plot=True, optimize=False)
+    spectral_sensitivity_layers(angle=63.5, thickness=50, material='Ag', plot=True)
+
+
 
 
