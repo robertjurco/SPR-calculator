@@ -422,11 +422,11 @@ def spectral_sensitivity_surface(angle: float,
 
 def spectral_sensitivity_layers(angle: float,
                                 thickness: float,
-                                wavelength_bounds: tuple = (1000, 2000),
+                                wavelength_bounds: tuple = (800, 3000),
                                 bulk_n: float = 1.33,
-                                layer_n: float = 1.4,
-                                layers_thickness: float = 15,
-                                num_layers: int = 10,
+                                layer_n: float = 1.34,
+                                layers_thickness: float = 25,
+                                num_layers: int = 50,
                                 material: str = 'Au',
                                 plot: bool = False):
     """
@@ -505,8 +505,8 @@ def spectral_sensitivity_layers(angle: float,
         ax2.tick_params(axis='y', labelcolor='black')
 
         # Add a combined legend
-        fig.legend(loc='upper left', bbox_to_anchor=(0.1, 0.85))
-        plt.title(f'Spectral Sensitivity and Min Wavelength vs. Number of Layers\nAngle: {angle:.2f}°')
+        fig.legend(loc='center right', bbox_to_anchor=(0.9, 0.5))
+        plt.title(f'Spectral Sensitivity and Min Wavelength vs. Number of Layers\nAngle: {angle:.2f}°, Thickness: {thickness:.2f} nm, Material: {material}')
         plt.show()
 
     return sensitivities, min_wavelengths
@@ -523,7 +523,7 @@ if __name__ == "__main__":
     #imaging_sensitivity_surface(angle=62.5, wavelength=wavelength, thickness=50, material='Ag', plot=True, optimize=True)
     #spectral_sensitivity_bulk(angle=63.5, wavelength=1500, bulk_n=bulk_n, thickness=50, material='Ag', plot=True, optimize=False)
     #spectral_sensitivity_surface(angle=62.5, wavelength=1500, surface_n=surface_n, thickness=50, material='Ag', plot=True, optimize=False)
-    spectral_sensitivity_layers(angle=63.5, thickness=50, material='Ag', plot=True)
+    spectral_sensitivity_layers(angle=63, thickness=50, material='Ag', plot=True)
 
 
 
